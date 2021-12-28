@@ -168,8 +168,10 @@ time cmake -D CMAKE_BUILD_TYPE=RELEASE \
       -D WITH_GSTREAMER_0_10=OFF \
       -D WITH_QT=ON \
       -D WITH_OPENGL=ON \
-      -D OPENCV_EXTRA_MODULES_PATH=/home/nvidia/opencv_contrib/modules \
-      -D BUILD_opencv_legacy=OFF \
+      -D CUDA_NVCC_FLAGS="--expt-relaxed-constexpr" \
+      -D WITH_TBB=ON \
+      -D CPACK_BINARY_DEB=ON \
+      -D OPENCV_EXTRA_MODULES_PATH=$OPENCV_SOURCE_DIR/opencv_contrib/modules \
       ../
 
 if [ $? -eq 0 ] ; then
