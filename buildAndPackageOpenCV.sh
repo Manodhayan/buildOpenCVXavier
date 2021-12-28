@@ -2,7 +2,7 @@
 # License: MIT. See license file in root directory
 # Copyright(c) JetsonHacks (2017-2018)
 
-OPENCV_VERSION=3.4.3
+OPENCV_VERSION=4.5.5
 # Jetson AGX Xavier
 ARCH_BIN=7.2
 # Jetson TX2
@@ -15,7 +15,8 @@ INSTALL_DIR=/usr/local
 #  OPENCV_TEST_DATA_PATH=../opencv_extra/testdata
 # Make sure that you set this to YES
 # Value should be YES or NO
-DOWNLOAD_OPENCV_EXTRAS=NO
+DOWNLOAD_OPENCV_EXTRAS="NO"
+DOWNLOAD_OPENCV_CONTRIB="YES"
 # Source code directory
 OPENCV_SOURCE_DIR=$HOME
 WHEREAMI=$PWD
@@ -64,6 +65,10 @@ if [ $DOWNLOAD_OPENCV_EXTRAS == "YES" ] ; then
  echo "Also installing opencv_extras"
 fi
 
+if [ $DOWNLOAD_OPENCV_CONTRIB == "YES" ] ; then
+ echo "Also installing opencv_contrib"
+fi
+
 # Repository setup
 sudo apt-add-repository universe
 sudo apt-get update
@@ -102,7 +107,7 @@ cd /usr/local/cuda/include
 sudo patch -N cuda_gl_interop.h $WHEREAMI'/patches/OpenGLHeader.patch' 
 # Clean up the OpenGL tegra libs that usually get crushed
 cd /usr/lib/aarch64-linux-gnu/
-# sudo ln -sf tegra/libGL.so libGL.so
+#sudo ln -sf tegra/libGL.so libGL.so
 
 # Python 2.7
 sudo apt-get install -y python-dev python-numpy python-py python-pytest
@@ -123,6 +128,15 @@ if [ $DOWNLOAD_OPENCV_EXTRAS == "YES" ] ; then
  cd $OPENCV_SOURCE_DIR
  git clone https://github.com/opencv/opencv_extra.git
  cd opencv_extra
+ git checkout -b v${OPENCV_VERSION} ${OPENCV_VERSION}
+fi
+
+if [ $DOWNLOAD_OPENCV_CONTRIB == "YES" ] ; then
+ echo "Installing opencv_contrib"
+ # This is for the test data
+ cd $OPENCV_SOURCE_DIR
+ git clone https://github.com/opencv/opencv_contrib.git
+ cd opencv_contrib
  git checkout -b v${OPENCV_VERSION} ${OPENCV_VERSION}
 fi
 
@@ -159,6 +173,7 @@ time cmake -D CMAKE_BUILD_TYPE=RELEASE \
       -D CUDA_NVCC_FLAGS="--expt-relaxed-constexpr" \
       -D WITH_TBB=ON \
       -D CPACK_BINARY_DEB=ON \
+      -D OPENCV_EXTRA_MODULES_PATH=$OPENCV_SOURCE_DIR/opencv_contrib/modules \
       ../
 
 if [ $? -eq 0 ] ; then

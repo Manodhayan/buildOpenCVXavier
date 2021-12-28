@@ -2,20 +2,22 @@
 # License: MIT. See license file in root directory
 # Copyright(c) JetsonHacks (2017-2018)
 
-OPENCV_VERSION=3.4.3
-# Jetson AGX Xavier
-ARCH_BIN=7.2
+OPENCV_VERSION=4.5.5
 # Jetson TX2
 #ARCH_BIN=6.2
 # Jetson TX1
 # ARCH_BIN=5.3
+
+# Jetson NX
+#ARCH_BIN=7.2
 INSTALL_DIR=/usr/local
 # Download the opencv_extras repository
 # If you are installing the opencv testdata, ie
 #  OPENCV_TEST_DATA_PATH=../opencv_extra/testdata
 # Make sure that you set this to YES
 # Value should be YES or NO
-DOWNLOAD_OPENCV_EXTRAS=NO
+DOWNLOAD_OPENCV_EXTRAS="NO"
+DOWNLOAD_OPENCV_CONTRIB="YES"
 # Source code directory
 OPENCV_SOURCE_DIR=$HOME
 WHEREAMI=$PWD
@@ -64,15 +66,16 @@ if [ $DOWNLOAD_OPENCV_EXTRAS == "YES" ] ; then
  echo "Also installing opencv_extras"
 fi
 
+if [ $DOWNLOAD_OPENCV_CONTRIB == "YES" ] ; then
+ echo "Also installing opencv_contrib"
+fi
+
 # Repository setup
 sudo apt-add-repository universe
 sudo apt-get update
 
 # Download dependencies for the desired configuration
 cd $WHEREAMI
-# For Ubuntu 18.04, add for OpenGL, ie
-# sudo apt-get install libgl1 libglvnd-dev
- 
 sudo apt-get install -y \
     cmake \
     libavcodec-dev \
@@ -82,8 +85,9 @@ sudo apt-get install -y \
     libglew-dev \
     libgtk2.0-dev \
     libgtk-3-dev \
+    libjasper-dev \
     libjpeg-dev \
-    libpng-dev \
+    libpng12-dev \
     libpostproc-dev \
     libswscale-dev \
     libtbb-dev \
@@ -93,16 +97,14 @@ sudo apt-get install -y \
     libx264-dev \
     qt5-default \
     zlib1g-dev \
-    libgl1 \
-    libglvnd-dev \
     pkg-config
 
 # https://devtalk.nvidia.com/default/topic/1007290/jetson-tx2/building-opencv-with-opengl-support-/post/5141945/#5141945
 cd /usr/local/cuda/include
 sudo patch -N cuda_gl_interop.h $WHEREAMI'/patches/OpenGLHeader.patch' 
 # Clean up the OpenGL tegra libs that usually get crushed
-cd /usr/lib/aarch64-linux-gnu/
-# sudo ln -sf tegra/libGL.so libGL.so
+#cd /usr/lib/aarch64-linux-gnu/
+#sudo ln -sf tegra/libGL.so libGL.so
 
 # Python 2.7
 sudo apt-get install -y python-dev python-numpy python-py python-pytest
@@ -116,6 +118,12 @@ cd $OPENCV_SOURCE_DIR
 git clone https://github.com/opencv/opencv.git
 cd opencv
 git checkout -b v${OPENCV_VERSION} ${OPENCV_VERSION}
+if [ $OPENCV_VERSION = 3.4.1 ] ; then
+  # For 3.4.1, use this commit to fix samples/gpu/CMakeLists.txt
+  git merge ec0bb66
+  # For 3.4.1, use this to fix C compilation issues (like in YOLO)
+  git cherry-pick 549b5df
+fi
 
 if [ $DOWNLOAD_OPENCV_EXTRAS == "YES" ] ; then
  echo "Installing opencv_extras"
@@ -123,6 +131,15 @@ if [ $DOWNLOAD_OPENCV_EXTRAS == "YES" ] ; then
  cd $OPENCV_SOURCE_DIR
  git clone https://github.com/opencv/opencv_extra.git
  cd opencv_extra
+ git checkout -b v${OPENCV_VERSION} ${OPENCV_VERSION}
+fi
+
+if [ $DOWNLOAD_OPENCV_CONTRIB == "YES" ] ; then
+ echo "Installing opencv_contrib"
+ # This is for the test data
+ cd $OPENCV_SOURCE_DIR
+ git clone https://github.com/opencv/opencv_contrib.git
+ cd opencv_contrib
  git checkout -b v${OPENCV_VERSION} ${OPENCV_VERSION}
 fi
 
@@ -138,11 +155,6 @@ cd build
 # There are also switches which tell CMAKE to build the samples and tests
 # Check OpenCV documentation for details
 
-# Added for this release of Jetson AGX Xavier from Jetson TX2
-#     -D CUDA_NVCC_FLAGS="--expt-relaxed-constexpr" \
-#     -D WITH_TBB=ON \
-
-
 time cmake -D CMAKE_BUILD_TYPE=RELEASE \
       -D CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX} \
       -D WITH_CUDA=ON \
@@ -156,8 +168,8 @@ time cmake -D CMAKE_BUILD_TYPE=RELEASE \
       -D WITH_GSTREAMER_0_10=OFF \
       -D WITH_QT=ON \
       -D WITH_OPENGL=ON \
-      -D CUDA_NVCC_FLAGS="--expt-relaxed-constexpr" \
-      -D WITH_TBB=ON \
+      -D OPENCV_EXTRA_MODULES_PATH=/home/nvidia/opencv_contrib/modules \
+      -D BUILD_opencv_legacy=OFF \
       ../
 
 if [ $? -eq 0 ] ; then
@@ -201,7 +213,7 @@ else
 fi
 
 # check installation
-IMPORT_CHECK="$(python -c "import cv2 ; print(cv2.__version__)")"
+IMPORT_CHECK="$(python -c "import cv2 ; print cv2.__version__")"
 if [[ $IMPORT_CHECK != *$OPENCV_VERSION* ]]; then
   echo "There was an error loading OpenCV in the Python sanity test."
   echo "The loaded version does not match the version built here."
